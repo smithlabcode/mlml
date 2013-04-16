@@ -39,6 +39,16 @@ using std::min;
  * g1 (j in expectation): Ts that are from 5mC in TAB-seq
  */
  
+/*
+static double
+log_sum_log(const double p, const double q) {
+  if (p == 0) {return q;}
+  else if (q == 0) {return p;}
+  const double larger = (p > q) ? p : q;
+  const double smaller = (p > q) ? q : p;
+  return larger + log(1.0 + exp(smaller - larger));
+}
+*/
 
 static double
 log_L(const size_t h, const size_t g,
@@ -56,23 +66,47 @@ log_L(const size_t h, const size_t g,
   return(log_lkhd);
 }
 
-
+static void
+get_start_point(const size_t t, const size_t u,
+                const size_t m, const size_t l,
+                const size_t h, const size_t g,
+                const double tolerance,
+                double &p_m, double &p_h) {
+  if (t+u==0) {
+    p_m = 1.0 * m / l;
+    p_h = 1.0 * h / g;
+  }
+  else if (m+l==0) {
+    p_h = 1.0 * h / g;
+    p_m = 1.0 - p_h;
+  }
+  else {
+    p_m = 1.0 * m / l;
+    p_h = 1.0 - p_m;
+  }
+  p_m = max(tolerance, min(p_m, 1-tolerance));
+  p_h = max(2*tolerance-p_m, min(p_h, 1-p_m-2*tolerance));
+}
 
 static void
 expectation(const size_t a, const size_t x,
 	    const double p, const double q,
 	    vector<vector<double> > &coeff) {
-  assert(p > 0.0 && q > 0.0);
-  assert(p + q < 1.0);
+  assert(p>0&&q>0);
+  assert(p+q<1);
+  double ln_p = log(p);
+  double ln_q = log(q);
+  double p_plus_q = log(p+q);
+  double p_u = log(1-p-q);
+  double non_q = log(1-q);
   coeff = vector<vector<double> >(x + 1, vector<double>(a + 1));
   for (size_t k = 0; k <= x; ++k)
     for (size_t j = 0; j <= a; ++j)
       coeff[k][j] = exp(gsl_sf_lnchoose(a, j) + 
-			log(q)*(a - j)+ log(p)*j - log(p + q)*a + 
+			ln_q*(a - j)+ ln_p*j - p_plus_q*a + 
 			gsl_sf_lnchoose(x, k) +	
-			log(p)*k + log(1.0-p-q)*(x - k)- log(1.0 - q)*x);
+			ln_p*k + p_u*(x - k)- non_q*x);
 }
-
 
 static double
 maximization(const size_t x, const size_t y,
@@ -87,7 +121,6 @@ maximization(const size_t x, const size_t y,
   return num/denom;
 }
 
-
 static double
 update_p_m(const size_t x, const size_t y,
 	   const size_t z, const size_t w,
@@ -99,9 +132,6 @@ update_p_m(const size_t x, const size_t y,
       num += coeff[k][j]*(k + j);
   return num/(a + b + x + y + z + w);
 }
-
-
-
 
 static void
 expectation_maximization(const bool VERBOSE,
@@ -118,10 +148,10 @@ expectation_maximization(const bool VERBOSE,
     const double M = maximization(x, y, a, b, coeff);
     const double p_old = p, q_old = q;
     p = update_p_m(x, y, z, w, a, b, coeff);
-    q = M*(1.0 - p); 
+    q = M*(1 - p); 
     p = max(tolerance, p);
-    p = min(1.0-tolerance, p);
-    q = max(tolerance,  min(q, 1 - p - tolerance));
+    p = min(1 - tolerance, p);
+    q = max(2 * tolerance - p,  min(q, 1 - p - 2 * tolerance));
     delta = max(fabs(p_old - p), fabs(q_old - q));
     
     if (VERBOSE){
@@ -176,7 +206,7 @@ main(int argc, const char **argv) {
     string hydroxy_file;
     string bs_seq_file;
     string outfile; 
-    static const double tolerance = 1e-10;
+    static double tolerance = 1e-10;
     
 
     /****************** COMMAND LINE OPTIONS ********************/
@@ -189,6 +219,8 @@ main(int argc, const char **argv) {
 		      false , hydroxy_file);
     opt_parse.add_opt("oxbsseq", 'm', "Name of input oxBS-Seq methcounts file",
 		      false , oxbs_seq_file);
+    opt_parse.add_opt("tolerance", 't', "EM convergence threshold. Default 1e-10",
+		      false , tolerance);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
 
@@ -241,14 +273,14 @@ main(int argc, const char **argv) {
 	parse_line(false, oxbs_line, m, l, o_chr, o_pos);
 	assert(h_chr == b_chr && h_chr == o_chr && 
 	       h_pos == o_pos && h_pos == b_pos);
-	double p_m = 0.5 - tolerance;
-	double p_h = 0.5 - tolerance;
+	double p_m,p_h;
 	if((h+g>0 && u+t >0 ) ||
 	   (h+g>0 && m+l >0 ) ||
 	   (m+l>0 && u+t >0 ) ){
 	  x = g; y = h;
 	  z = m; w = l;
 	  a = t; b = u;
+          get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
 	  expectation_maximization(VERBOSE, x, y, z, w, a, b, tolerance, p_m, p_h); 
 	  if (p_h <= 2.0*tolerance) p_h = 0;
 	  if (p_m <= 2.0*tolerance) p_m = 0;
