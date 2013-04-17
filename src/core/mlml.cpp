@@ -298,11 +298,11 @@ main(int argc, const char **argv) {
 	  a = t; b = u;
           get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
 	  expectation_maximization(VERBOSE, x, y, z, w, a, b, tolerance, p_m, p_h); 
-	  if (p_h <= 2.0*tolerance) p_h = 0;
-	  if (p_m <= 2.0*tolerance) p_m = 0;
-	  if (p_m >= 1-2.0*tolerance) p_m = 1;
-	  if (p_h >= 1-2.0*tolerance) p_h =1;
-          if (p_m + p_h >= 1-2.0*tolerance) p_h += tolerance;
+	  if (p_h <= 2*tolerance) p_h = 0;
+	  if (p_m <= 2*tolerance) p_m = 0;
+	  if (p_m >= 1-2*tolerance) p_m = 1;
+	  if (p_h >= 1-2*tolerance) p_h =1;
+          if (p_m + p_h >= 1-2*tolerance && p_h > 2*tolerance) p_h += tolerance;
 	  //cout << h << '\t' << g << '\t' << m << '\t' << l << '\t' << u << '\t' << t << endl;
 	  //cout << p_h << '\t' << p_m << endl;
 	  out << h_chr << '\t' << h_pos << '\t'
@@ -341,13 +341,13 @@ main(int argc, const char **argv) {
           get_start_point(f_rev,oxbs_seq_file.empty(),x,y,z,w,tolerance,p,q);
 	  expectation_maximization(VERBOSE,x, y, z, w, 0, 0, tolerance, p, q); 
           r = 1-p-q;
-	  if (p <= 2.0*tolerance) p = 0;
-	  if (q <= 2.0*tolerance) q = 0;
-	  if (r <= 2.0*tolerance) r = 0;
-	  if (p >= 1-2.0*tolerance) p = 1;
-	  if (q >= 1-2.0*tolerance) q = 1;
-	  if (r >= 1-2.0*tolerance) r = 1;
-          if (p + q >= 1-2.0*tolerance) q += tolerance;
+	  if (p <= 2*tolerance) p = 0;
+	  if (q <= 2*tolerance) q = 0;
+	  if (r <= 2*tolerance) r = 0;
+	  if (p >= 1-2*tolerance) p = 1;
+	  if (q >= 1-2*tolerance) q = 1;
+	  if (r >= 1-2*tolerance) r = 1;
+          if (p + q >= 1-2*tolerance) q += tolerance;
 	  out << f_chr << '\t' << f_pos << '\t'
 	      << f_pos  +1 << '\t' << "mC:";
 	  if(oxbs_seq_file.empty())
