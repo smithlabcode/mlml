@@ -58,5 +58,12 @@ chr1    3001345 3001346 mC:0.125        0.652778        +
 The fourth column is estimated 5mC level, and the fifth column is 5hmC level. Note that the output is always in this format, no matter what combination of inputs are used. Therefore user can easily extract 5mC and 5hmC levels from specific columns.
 
 \section{FAQ}
+\begin{itemize}
+\item Q: I got result like this, what happened?
+\begin{verbatim}
+chr1    10570   10571   mC:nan  nan     +
+\end{verbatim}
+A: Because some sites have 0 coverage, there is not enough information to calculate mC and hmC levels. Therefore the output will be nan instead.
+\end{itemize}
 
 \end{document}

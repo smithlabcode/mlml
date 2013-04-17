@@ -33,15 +33,15 @@ USAGE
 
 -u, -bsseq
   Specify the input file path for BS-seq file. The input file format should be
-  methcounts format.
+  BED format.
 
 -h, -tabseq
   Specify the input file path for Tab-seq file. The input file format should be
-  methcounts format.
+  BED format.
 
 -m, -oxbsseq
   Specify the input file path for oxBS-seq file. The input file format should be
-  methcounts format.
+  BED format.
 
 * Note: at least two of -u, -h and -m options are required.
 
@@ -70,10 +70,8 @@ EXAMPLES
 
 INPUT FILE FORMAT
 -------------------------------------------------------------------------------
-All input files for -u, -m and -h options should be in methcounts format.
-methcounts is a component of methpipe software ().
-methcounts format is basically BED format (see reference at
-https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Followed is an example:
+All input files for -u, -m and -h options should be in BED format. Detailed
+file format is discussed in manual. Followed is an example:
 
 chr1	3001345 3001346 CpG:9   0.777777777778  +
 

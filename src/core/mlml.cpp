@@ -38,17 +38,6 @@ using std::min;
  * t1 (k in expectation): Cs that are from 5mC in BS-seq
  * g1 (j in expectation): Ts that are from 5mC in TAB-seq
  */
- 
-/*
-static double
-log_sum_log(const double p, const double q) {
-  if (p == 0) {return q;}
-  else if (q == 0) {return p;}
-  const double larger = (p > q) ? p : q;
-  const double smaller = (p > q) ? q : p;
-  return larger + log(1.0 + exp(smaller - larger));
-}
-*/
 
 static double
 log_L(const size_t h, const size_t g,
@@ -72,20 +61,47 @@ get_start_point(const size_t t, const size_t u,
                 const size_t h, const size_t g,
                 const double tolerance,
                 double &p_m, double &p_h) {
+  //get start point if all 3 inputs are available
+
   if (t+u==0) {
-    p_m = 1.0 * m / l;
-    p_h = 1.0 * h / g;
+    p_m = 1.0 * m / (m+l);
+    p_h = 1.0 * h / (h+g);
   }
   else if (m+l==0) {
-    p_h = 1.0 * h / g;
+    p_h = 1.0 * h / (h+g);
     p_m = 1.0 - p_h;
   }
   else {
-    p_m = 1.0 * m / l;
+    p_m = 1.0 * m / (m+l);
     p_h = 1.0 - p_m;
   }
-  p_m = max(tolerance, min(p_m, 1-tolerance));
-  p_h = max(2*tolerance-p_m, min(p_h, 1-p_m-2*tolerance));
+  p_m = max(tolerance, min(p_m, 1-2*tolerance));
+  p_h = max(tolerance, min(p_h, 1-tolerance-p_m));
+}
+
+static void
+get_start_point(const bool rev, const bool oxseq_empty,
+                const size_t x, const size_t y,
+                const size_t z, const size_t w,
+                const double tolerance,
+                double &p_m, double &p_h) {
+  //get start point if only 2 inputs are available
+  if (rev) {
+    // oxBS + Tab
+    p_m = 1.0 * x / (x+y);
+    p_h = 1.0 * z / (z+w);
+  } else if (oxseq_empty) {
+    // BS + Tab
+    p_h = 1.0 * z / (z+w);
+    p_m = 1 - p_h;
+  } else {
+    // BS + ox
+    p_m = 1.0 * x / (x+y);
+    p_h = 1 - p_m;
+  }
+
+  p_m = max(tolerance, min(p_m, 1-2*tolerance));
+  p_h = max(tolerance, min(p_h, 1-tolerance-p_m));
 }
 
 static void
@@ -149,9 +165,8 @@ expectation_maximization(const bool VERBOSE,
     const double p_old = p, q_old = q;
     p = update_p_m(x, y, z, w, a, b, coeff);
     q = M*(1 - p); 
-    p = max(tolerance, p);
-    p = min(1 - tolerance, p);
-    q = max(2 * tolerance - p,  min(q, 1 - p - 2 * tolerance));
+    p = max(tolerance, min(p, 1-2*tolerance));
+    q = max(tolerance, min(q, 1-tolerance-p));
     delta = max(fabs(p_old - p), fabs(q_old - q));
     
     if (VERBOSE){
@@ -247,6 +262,7 @@ main(int argc, const char **argv) {
 	 (bs_seq_file.empty() && hydroxy_file.empty() )) {
       cerr << "Please specify at least 2 bed files as input" << endl;
     }
+    tolerance = max(1e-15, min(tolerance, 0.1));
 
     /****************** END COMMAND LINE OPTIONS *****************/
     std::ofstream out(outfile.empty() ? "/dev/stdout" : outfile.c_str());
@@ -286,6 +302,7 @@ main(int argc, const char **argv) {
 	  if (p_m <= 2.0*tolerance) p_m = 0;
 	  if (p_m >= 1-2.0*tolerance) p_m = 1;
 	  if (p_h >= 1-2.0*tolerance) p_h =1;
+          if (p_m + p_h >= 1-2.0*tolerance) p_h += tolerance;
 	  //cout << h << '\t' << g << '\t' << m << '\t' << l << '\t' << u << '\t' << t << endl;
 	  //cout << p_h << '\t' << p_m << endl;
 	  out << h_chr << '\t' << h_pos << '\t'
@@ -319,25 +336,29 @@ main(int argc, const char **argv) {
 	parse_line(f_rev, f_line, x, y, f_chr, f_pos);
 	parse_line(s_rev, s_line, z, w, s_chr, s_pos);
 	assert(f_chr == s_chr && f_pos == s_pos);
-	double p = 0.5 - tolerance;
-	double q = 0.5 - tolerance;
+	double p,q,r;
 	if(x+y>0 && z+w >0){
+          get_start_point(f_rev,oxbs_seq_file.empty(),x,y,z,w,tolerance,p,q);
 	  expectation_maximization(VERBOSE,x, y, z, w, 0, 0, tolerance, p, q); 
+          r = 1-p-q;
 	  if (p <= 2.0*tolerance) p = 0;
 	  if (q <= 2.0*tolerance) q = 0;
+	  if (r <= 2.0*tolerance) r = 0;
 	  if (p >= 1-2.0*tolerance) p = 1;
-	  if (q >= 1-2.0*tolerance) q =1;
+	  if (q >= 1-2.0*tolerance) q = 1;
+	  if (r >= 1-2.0*tolerance) r = 1;
+          if (p + q >= 1-2.0*tolerance) q += tolerance;
 	  out << f_chr << '\t' << f_pos << '\t'
-	      << f_pos +1 << '\t' << "mC:";
+	      << f_pos  +1 << '\t' << "mC:";
 	  if(oxbs_seq_file.empty())
-	    out << 1.0-p-q << '\t' << p << '\t' << '+' << endl;
+	    out << r << '\t' << p << '\t' << '+' << endl;
 	  else if (hydroxy_file.empty())
-	    out << p << '\t' << 1.0 - p - q << '\t' << '+' << endl;
+	    out << p << '\t' << r << '\t' << '+' << endl;
 	  else 
 	    out << p << '\t' << q << '\t' << '+' << endl;
 	}else{
 	  out << f_chr << '\t' << f_pos << '\t'
-	      << f_pos +1 << "\tmC:nan\tnan\t+" << endl;
+	      << f_pos + 1 << "\tmC:nan\tnan\t+" << endl;
 	}
       } 
     }
