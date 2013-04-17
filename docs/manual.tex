@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+
+\usepackage{times,fullpage}
+\usepackage[pdfborder={0 0 0}]{hyperref}
+
+\title{MLML User Guide} 
+\author{Jenny Qu \and Meng Zhou \and Qiang Song \and Elizabeth Hong \and Andrew Smith}
+
+%% For program names
+\newcommand{\prog}[1]{\texttt{#1}}
+%% For file names
+\newcommand{\fn}[1]{\texttt{#1}}
+%% For program options
+\newcommand{\op}[1]{\texttt{#1}}
+
+\begin{document}
+
+\maketitle
+
+\prog{mlml} aims to simultaneously make consistent estimation of 5mC and 5hmC levels. It is developed to analyze DNA methylation level data. The input can be any pair of BS-seq, oxBS-seq and Tab-seq data or all of them.
+
+\section{Input file format}
+%% Problem of describing input format. Should methpipe be mentioned?
+The input format is BED format file with 6 columns (\url{https://genome.ucsc.edu/FAQ/FAQformat.html\#format1}). Below is an example for a line of input file:
+\begin{verbatim}
+chr1    3001345 3001346 CpG:9   0.777777777778  +
+\end{verbatim}
+
+\noindent
+The first three columns are genomic coordinates of a region. The fourth column indicates that this site is a CpG site, and the number of reads covering this site is 9. The fifth column is the methylation level of the CpG site, ranging from 0 to 1. This level is usually calculated from the number of methylated reads covering one site dividing by the total number of reads included in the fourth column.
+
+\section{Usage}
+The usage of \prog{mlml} is simple: specify the input files with corresponding options to their types. \prog{mlml} can take various types of input combinations. Assume user has three input files ready: \fn{meth\_BS-seq.bed}, \fn{meth\_oxBS-seq.bed} and \fn{meth\_Tab-seq.bed}, all in the format described above. The following command will take all the inputs:
+\begin{verbatim}
+$ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
+         -h meth_Tab-seq.bed -o result.bed
+\end{verbatim}
+Note this command should be run in the path where \prog{mlml} is installed. The option \op{-o} will direct the output to file \fn{result.bed}.
+
+If only two types of input are available, e.g. \fn{meth\_BS-seq.bed} and \fn{meth\_oxBS-seq.bed}, then use the following command:
+\begin{verbatim}
+$ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
+         -o result.bed
+\end{verbatim}
+
+In some cases, user might want to specify the covergence tolerance for EM algorithm. This can be done through \op{-t} option. For example:
+\begin{verbatim}
+$ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
+         -o result.bed -t 1e-2
+\end{verbatim}
+This command will make the iteration process stop when the diference of estimation between two iterations is less than $10^{-2}$. The value format can be scientific notation, e.g. 1e-5, or float number, e.g. 0.00001.
+
+\section{Output file format}
+The output of \prog{mlml} is also in BED format. Here is an example:
+\begin{verbatim}
+chr1    3001345 3001346 mC:0.125        0.652778        +
+\end{verbatim}
+The fourth column is estimated 5mC level, and the fifth column is 5hmC level. Note that the output is always in this format, no matter what combination of inputs are used. Therefore user can easily extract 5mC and 5hmC levels from specific columns.
+
+\section{FAQ}
+
+\end{document}
