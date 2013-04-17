@@ -17,7 +17,6 @@ using std::max;
 using std::min;
 
 
-
 /* NOTATION: 
  * p_m: probability of mC
  * p_h: probability of hmC
@@ -40,39 +39,41 @@ using std::min;
  */
 
 static double
-log_L(const size_t h, const size_t g,
-      const size_t m, const size_t l,
-      const size_t u, const size_t t,
-      const double p_h, const double p_m){
+log_L(const size_t h, const size_t g, const size_t m, const size_t l,
+      const size_t u, const size_t t, const double p_h, const double p_m) {
   double log_lkhd = gsl_sf_lnchoose(h+g, h) + gsl_sf_lnchoose(m+l, m) +
     gsl_sf_lnchoose(u+t, u);
-  if (p_h>0) log_lkhd += h*log(p_h);
-  if (p_h<1) log_lkhd += g*log(1-p_h);
-  if(p_m>0) log_lkhd += m*log(p_m);
-  if(p_m<1) log_lkhd += l*log(1-p_m);
-  if(p_h+p_m <1) log_lkhd += u*log(1-p_h-p_m);
-  if(p_h+p_m >0)log_lkhd += t*log(p_h+p_m);
-  return(log_lkhd);
+
+  if (p_h > 0) log_lkhd += h*log(p_h);
+  if (p_h < 1) log_lkhd += g*log(1-p_h);
+ 
+  if (p_m > 0) log_lkhd += m*log(p_m);
+  if (p_m < 1) log_lkhd += l*log(1-p_m);
+
+  if (p_h + p_m < 1) log_lkhd += u*log(1-p_h-p_m);
+  if (p_h + p_m > 0)log_lkhd += t*log(p_h+p_m);
+
+  return log_lkhd;
 }
 
 static void
 get_start_point(const size_t t, const size_t u,
-                const size_t m, const size_t l,
-                const size_t h, const size_t g,
-                const double tolerance,
-                double &p_m, double &p_h) {
+		const size_t m, const size_t l,
+		const size_t h, const size_t g,
+		const double tolerance,
+		double &p_m, double &p_h) {
   //get start point if all 3 inputs are available
 
-  if (t+u==0) {
-    p_m = 1.0 * m / (m+l);
-    p_h = 1.0 * h / (h+g);
+  if (t + u == 0) {
+    p_m = 1.0*m/(m + l);
+    p_h = 1.0*h/(h + g);
   }
-  else if (m+l==0) {
-    p_h = 1.0 * h / (h+g);
+  else if (m + l == 0) {
+    p_h = 1.0* h/(h+g);
     p_m = 1.0 - p_h;
   }
   else {
-    p_m = 1.0 * m / (m+l);
+    p_m = 1.0*m/(m + l);
     p_h = 1.0 - p_m;
   }
   p_m = max(tolerance, min(p_m, 1-2*tolerance));
@@ -81,59 +82,64 @@ get_start_point(const size_t t, const size_t u,
 
 static void
 get_start_point(const bool rev, const bool oxseq_empty,
-                const size_t x, const size_t y,
-                const size_t z, const size_t w,
-                const double tolerance,
-                double &p_m, double &p_h) {
+		const size_t x, const size_t y,
+		const size_t z, const size_t w,
+		const double tolerance,
+		double &p_m, double &p_h) {
   //get start point if only 2 inputs are available
-  if (rev) {
-    // oxBS + Tab
-    p_m = 1.0 * x / (x+y);
-    p_h = 1.0 * z / (z+w);
-  } else if (oxseq_empty) {
-    // BS + Tab
-    p_h = 1.0 * z / (z+w);
-    p_m = 1 - p_h;
-  } else {
-    // BS + ox
-    p_m = 1.0 * x / (x+y);
-    p_h = 1 - p_m;
+  if (rev) { // oxBS + Tab
+    p_m = 1.0*x/(x + y);
+    p_h = 1.0*z/(z + w);
+  } else if (oxseq_empty) { // BS + Tab
+    p_h = 1.0*z/(z+w);
+    p_m = 1.0 - p_h;
+  } else { // BS + ox
+    p_m = 1.0*x/(x + y);
+    p_h = 1.0 - p_m;
   }
-
-  p_m = max(tolerance, min(p_m, 1-2*tolerance));
-  p_h = max(tolerance, min(p_h, 1-tolerance-p_m));
+ 
+  p_m = max(tolerance, min(p_m, 1.0 - 2.0*tolerance));
+  p_h = max(tolerance, min(p_h, 1.0 - p_m - tolerance));
 }
 
 static void
 expectation(const size_t a, const size_t x,
 	    const double p, const double q,
 	    vector<vector<double> > &coeff) {
-  assert(p>0&&q>0);
-  assert(p+q<1);
-  double ln_p = log(p);
-  double ln_q = log(q);
-  double p_plus_q = log(p+q);
-  double p_u = log(1-p-q);
-  double non_q = log(1-q);
+  assert(p > 0.0 && q > 0.0);
+  assert(p + q <= 1.0);
   coeff = vector<vector<double> >(x + 1, vector<double>(a + 1));
-  for (size_t k = 0; k <= x; ++k)
+
+  const double log_p = log(p);
+  const double log_1mpq = log(1.0 - p - q);
+  const double log_q = log(q);
+  const double log_1mq = log(1.0 - q);
+  const double log_p_q = log(p + q);
+
+  vector<double> a_c_j;
+  for (size_t j = 0; j <= a; ++j)
+    a_c_j.push_back(gsl_sf_lnchoose(a, j) + log_q*(a - j) + log_p*j - log_p_q*a);
+  
+  for (size_t k = 0; k <= x; ++k) {
+    const double x_c_k = gsl_sf_lnchoose(x, k) + log_p*k + log_1mpq*(x - k) - log_1mq*x;
     for (size_t j = 0; j <= a; ++j)
-      coeff[k][j] = exp(gsl_sf_lnchoose(a, j) + 
-			ln_q*(a - j)+ ln_p*j - p_plus_q*a + 
-			gsl_sf_lnchoose(x, k) +	
-			ln_p*k + p_u*(x - k)- non_q*x);
+      coeff[k][j] = exp(a_c_j[j] + x_c_k);
+  }
 }
 
 static double
 maximization(const size_t x, const size_t y,
 	     const size_t a, const size_t b,
-	     const vector<vector<double> > &coeff){
-  double num = y, denom = y+b;
-  for (size_t k = 0; k <= x; ++k)
+	     const vector<vector<double> > &coeff) {
+  double num = y, denom = y + b;
+  for (size_t k = 0; k <= x; ++k) {
+    vector<double>::const_iterator c(coeff[k].begin());
     for (size_t j = 0; j <= a; ++j) {
-      num += coeff[k][j]*(a - j);
-      denom += coeff[k][j]*(a + x - k - j);
+      num += (*c)*(a - j);
+      denom += (*c)*(a + x - k - j);
+      ++c;
     }
+  }
   return num/denom;
 }
 
@@ -141,7 +147,7 @@ static double
 update_p_m(const size_t x, const size_t y,
 	   const size_t z, const size_t w,
 	   const size_t a, const size_t b, 
-	   const vector<vector<double> > &coeff){
+	   const vector<vector<double> > &coeff) {
   double num = z;
   for (size_t k = 0; k <= x; ++k)
     for (size_t j = 0; j <= a; ++j)
@@ -155,7 +161,7 @@ expectation_maximization(const bool VERBOSE,
 			 const size_t z, const size_t w,
 			 const size_t a, const size_t b,
 			 const double tolerance, 
-			 double &p, double &q){
+			 double &p, double &q) {
   size_t iter = 0;
   double delta = std::numeric_limits<double>::max();
   do {
@@ -168,8 +174,8 @@ expectation_maximization(const bool VERBOSE,
     p = max(tolerance, min(p, 1-2*tolerance));
     q = max(tolerance, min(q, 1-tolerance-p));
     delta = max(fabs(p_old - p), fabs(q_old - q));
-    
-    if (VERBOSE){
+  
+    if (VERBOSE) {
       cerr << iter++ << '\t'
 	   << "M=" << M << '\t'
 	   << "p_m=" << p << '\t'
@@ -183,13 +189,13 @@ expectation_maximization(const bool VERBOSE,
 
 
 // when REV= false : 'a' is the number of C reads, 
-//               and 'b' is the number of T reads.
-// when REV= true :  'a' is the number of T reads, 
-//               and 'b' is the number of C reads.
+//        and 'b' is the number of T reads.
+// when REV= true : 'a' is the number of T reads, 
+//        and 'b' is the number of C reads.
 static void
 parse_line(const bool REV, const string &line, 
 	   size_t &a, size_t &b, string &chr, size_t &pos) {
-  
+ 
   std::istringstream is(line);
   is >> chr;
   is >> pos;
@@ -199,12 +205,13 @@ parse_line(const bool REV, const string &line,
   is >> dummy >> str_count >> level;
   size_t count = 
     atoi(str_count.substr(str_count.find_first_of(":") + 1).c_str());
-  if (count>50) count = 50;
-
-  if(REV){
+  if (count > 50) count = 50;
+  
+  if (REV) {
     b = static_cast<size_t>(count*level);
     a = count - b;
-  }else{
+  }
+  else {
     a = static_cast<size_t>(count*level);
     b = count - a;
   }
@@ -213,16 +220,16 @@ parse_line(const bool REV, const string &line,
 
 int 
 main(int argc, const char **argv) {
-  
+ 
   try {
-    
+  
     bool VERBOSE = false;
     string oxbs_seq_file;
     string hydroxy_file;
     string bs_seq_file;
     string outfile; 
     static double tolerance = 1e-10;
-    
+  
 
     /****************** COMMAND LINE OPTIONS ********************/
     OptionParser opt_parse(strip_path(argv[0]), "", "");
@@ -257,13 +264,13 @@ main(int argc, const char **argv) {
       cerr << opt_parse.help_message() << endl;
       return EXIT_SUCCESS;
     }
-    if ( (oxbs_seq_file.empty() && hydroxy_file.empty() ) ||
-	 (oxbs_seq_file.empty() && bs_seq_file.empty() ) ||
-	 (bs_seq_file.empty() && hydroxy_file.empty() )) {
+    if ((oxbs_seq_file.empty() && hydroxy_file.empty()) ||
+	(oxbs_seq_file.empty() && bs_seq_file.empty()) ||
+	(bs_seq_file.empty() && hydroxy_file.empty())) {
       cerr << "Please specify at least 2 bed files as input" << endl;
     }
     tolerance = max(1e-15, min(tolerance, 0.1));
-
+    
     /****************** END COMMAND LINE OPTIONS *****************/
     std::ofstream out(outfile.empty() ? "/dev/stdout" : outfile.c_str());
 	
@@ -275,88 +282,97 @@ main(int argc, const char **argv) {
     size_t t = 0;
     size_t x = 0, y = 0, z = 0, w = 0, a = 0, b= 0;
 
-    if(!hydroxy_file.empty() && !bs_seq_file.empty() && !oxbs_seq_file.empty()){
+    if (!hydroxy_file.empty() && !bs_seq_file.empty() && !oxbs_seq_file.empty()) {
       std::ifstream h_in(hydroxy_file.c_str());
       std::ifstream b_in(bs_seq_file.c_str());
       std::ifstream o_in(oxbs_seq_file.c_str());
+
       string hydroxy_line, bs_line, oxbs_line;
       string h_chr, b_chr, o_chr;
       size_t h_pos = 0, b_pos = 0, o_pos = 0;
-      while (getline(h_in, hydroxy_line) && getline(b_in, bs_line) &&
-	     getline(o_in, oxbs_line)) {  
+   
+      while (getline(h_in, hydroxy_line) && 
+	     getline(b_in, bs_line) &&
+	     getline(o_in, oxbs_line)) { 
+	
 	parse_line(false, hydroxy_line, h, g, h_chr, h_pos);
 	parse_line(false, bs_line, t, u, b_chr, b_pos);
 	parse_line(false, oxbs_line, m, l, o_chr, o_pos);
+	
 	assert(h_chr == b_chr && h_chr == o_chr && 
 	       h_pos == o_pos && h_pos == b_pos);
-	double p_m,p_h;
-	if((h+g>0 && u+t >0 ) ||
-	   (h+g>0 && m+l >0 ) ||
-	   (m+l>0 && u+t >0 ) ){
+	
+	double p_m = 0.0, p_h = 0.0;
+	if ((h + g > 0 && u + t > 0 ) ||
+	    (h + g > 0 && m + l > 0 ) ||
+	    (m + l > 0 && u + t > 0 ) ) {
 	  x = g; y = h;
 	  z = m; w = l;
 	  a = t; b = u;
-          get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
+	  get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
 	  expectation_maximization(VERBOSE, x, y, z, w, a, b, tolerance, p_m, p_h); 
-	  if (p_h <= 2*tolerance) p_h = 0;
-	  if (p_m <= 2*tolerance) p_m = 0;
-	  if (p_m >= 1-2*tolerance) p_m = 1;
-	  if (p_h >= 1-2*tolerance) p_h =1;
-          if (p_m + p_h >= 1-2*tolerance && p_h > 2*tolerance) p_h += tolerance;
-	  //cout << h << '\t' << g << '\t' << m << '\t' << l << '\t' << u << '\t' << t << endl;
-	  //cout << p_h << '\t' << p_m << endl;
+	  if (p_h <= 2.0*tolerance) p_h = 0.0;
+	  if (p_m <= 2.0*tolerance) p_m = 0.0;
+	  if (p_m >= 1.0-2.0*tolerance) p_m = 1.0;
+	  if (p_h >= 1.0-2.0*tolerance) p_h =1.0;
+          if (p_m + p_h >= 1.0-2.0*tolerance && p_h > 2.0*tolerance) p_h += tolerance;
 	  out << h_chr << '\t' << h_pos << '\t'
 	      << h_pos +1 << '\t' << "mC:"<<p_m << '\t'
 	      << p_h << '\t' << '+' << endl;
-	}else{
+	}
+	else {
 	  out << h_chr << '\t' << h_pos << '\t'
 	      << h_pos +1 << '\t' << "mC:nan\tnan\t+" << endl;
 	}
       }
-    }else{
-      std::ifstream f_in;
-      std::ifstream s_in;
+    }
+    else {
+      std::ifstream f_in, s_in;
       string f_line, s_line, f_chr, s_chr;
       size_t f_pos = 0, s_pos = 0;
       bool f_rev = false, s_rev = false;
-      size_t x = 0, y=0, z=0, w=0;
-      if(oxbs_seq_file.empty()){
+      size_t x = 0, y = 0, z = 0, w = 0;
+      if (oxbs_seq_file.empty()) {
 	f_in.open(bs_seq_file.c_str());
 	s_in.open(hydroxy_file.c_str());
-      }else if(hydroxy_file.empty()){
+      }
+      else if (hydroxy_file.empty()) {
 	f_in.open(bs_seq_file.c_str());
 	s_in.open(oxbs_seq_file.c_str());
-      }else{
+      }
+      else {
 	f_rev = true; 
 	f_in.open(hydroxy_file.c_str());
 	s_in.open(oxbs_seq_file.c_str());
       }
 
-      while (getline(f_in, f_line) && getline(s_in, s_line)) {  
+      while (getline(f_in, f_line) && getline(s_in, s_line)) { 
 	parse_line(f_rev, f_line, x, y, f_chr, f_pos);
 	parse_line(s_rev, s_line, z, w, s_chr, s_pos);
 	assert(f_chr == s_chr && f_pos == s_pos);
-	double p,q,r;
-	if(x+y>0 && z+w >0){
-          get_start_point(f_rev,oxbs_seq_file.empty(),x,y,z,w,tolerance,p,q);
+	
+	double p = 0.0, q = 0.0, r = 0.0;
+	if (x + y > 0 && z + w > 0) {
+	  get_start_point(f_rev,oxbs_seq_file.empty(),x,y,z,w,tolerance,p,q);
 	  expectation_maximization(VERBOSE,x, y, z, w, 0, 0, tolerance, p, q); 
-          r = 1-p-q;
-	  if (p <= 2*tolerance) p = 0;
-	  if (q <= 2*tolerance) q = 0;
-	  if (r <= 2*tolerance) r = 0;
-	  if (p >= 1-2*tolerance) p = 1;
-	  if (q >= 1-2*tolerance) q = 1;
-	  if (r >= 1-2*tolerance) r = 1;
-          if (p + q >= 1-2*tolerance) q += tolerance;
+	  r = 1.0 - p - q;
+	  if (p <= 2.0*tolerance) p = 0.0;
+	  if (q <= 2.0*tolerance) q = 0.0;
+	  if (r <= 2.0*tolerance) r = 0.0;
+	  if (p >= 1.0 - 2.0*tolerance) p = 1.0;
+	  if (q >= 1.0 - 2.0*tolerance) q = 1.0;
+	  if (r >= 1.0 - 2.0*tolerance) r = 1.0;
+	  if (p + q >= 1.0 - 2.0*tolerance && q > 2.0*tolerance) q += tolerance;
 	  out << f_chr << '\t' << f_pos << '\t'
-	      << f_pos  +1 << '\t' << "mC:";
-	  if(oxbs_seq_file.empty())
+	      << f_pos +1 << '\t' << "mC:";
+	  if (oxbs_seq_file.empty())
 	    out << r << '\t' << p << '\t' << '+' << endl;
 	  else if (hydroxy_file.empty())
 	    out << p << '\t' << r << '\t' << '+' << endl;
 	  else 
 	    out << p << '\t' << q << '\t' << '+' << endl;
-	}else{
+	}
+	else {
 	  out << f_chr << '\t' << f_pos << '\t'
 	      << f_pos + 1 << "\tmC:nan\tnan\t+" << endl;
 	}

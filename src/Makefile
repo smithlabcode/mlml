@@ -1,7 +1,7 @@
-#    This file is part of the mlml package
+#    This file is part of MLML
 #
 #    Copyright (C) 2013 University of Southern California and
-#             Meng Zhou, Jianghan Qu, Andrew D. Smith
+#             		Meng Zhou, Jianghan Qu, Andrew D. Smith
 #
 #    Authors: Meng Zhou, Jianghan Qu and Andrew D. Smith
 #
@@ -19,36 +19,44 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-ifndef SMITHLAB_CPP
-SMITHLAB_CPP=$(MLML_ROOT)/src/smithlab_cpp
+PROGS = mlml
+
+CXX = g++
+CFLAGS = -Wall -fmessage-length=50
+CXXFLAGS = -Wall -fmessage-length=50
+OPTFLAGS = -O2
+DEBUGFLAGS = -g
+SMITHLAB_CPP = smithlab_cpp
+
+ifdef DEBUG
+CXXFLAGS += $(DEBUGFLAGS)
 endif
 
-all_subdirs=smithlab_cpp core
-lib_subdirs=smithlab_cpp
-app_subdirs=core
+ifdef OPT
+CXXFLAGS += $(OPTFLAGS)
+endif
 
-## COMMENT: The smithlab_cpp directory is only appearing in the
-## "clean" target below because the compilation of object files inside
-## that directory is achieved through dependency structure -- the
-## reason we do it this way is because much in smithlab_cpp is not
-## needed for mlml.
+INCLUDEDIRS = $(SMITHLAB_CPP)
 
-all:
-	@for i in $(app_subdirs); do \
-		make -C $${i} SMITHLAB_CPP=$(SMITHLAB_CPP) SRC_ROOT=$(MLML_ROOT) OPT=1; \
-	done;
+LIBS = -lgsl -lgslcblas 
 
-install:
-	@for i in $(app_subdirs); do \
-		make -C $${i} SMITHLAB_CPP=$(SMITHLAB_CPP) SRC_ROOT=$(MLML_ROOT) OPT=1 install; \
-	done;
+all: $(PROGS)
 
-test:
-	@for i in $(app_subdirs); do \
-		make -C $${i} SMITHLAB_CPP=$(SMITHLAB_CPP) SRC_ROOT=$(MLML_ROOT) test; \
-	done;
+install: $(PROGS)
+	@mkdir -p $(SRC_ROOT)/bin
+	@install -m 755 $(PROGS) $(SRC_ROOT)/bin
+
+$(PROGS): $(addprefix $(SMITHLAB_CPP)/, \
+	smithlab_os.o smithlab_utils.o GenomicRegion.o OptionParser.o)
+
+%.o: %.cpp %.hpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+%: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ -I $(INCLUDEDIRS) $(LIBS)
 
 clean:
-	@for i in $(all_subdirs); do \
-		make -C $${i} SMITHLAB_CPP=$(SMITHLAB_CPP) SRC_ROOT=$(MLML_ROOT) clean; \
-	done;
+	@-make -C smithlab_cpp clean
+	@-rm -f $(PROGS) *.o *.so *.a *~
+
+.PHONY: clean
