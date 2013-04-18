@@ -20,6 +20,7 @@
 #
 
 PROGS = mlml
+SRC_ROOT = $(MLML_ROOT)
 
 CXX = g++
 CFLAGS = -Wall -fmessage-length=50
