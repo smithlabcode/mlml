@@ -1,6 +1,6 @@
 For more details, please read the user manual in docs/manual.pdf
 
-PREREQUISITS
+PREREQUISITES
 -------------------------------------------------------------------------------
 GNU Compiler Collection (GCC)
   This software requires a C++ complier to build. The most recent version of
