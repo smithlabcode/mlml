@@ -19,6 +19,9 @@
 
 \prog{mlml} aims to simultaneously make consistent estimation of 5mC and 5hmC levels. It is developed to analyze DNA methylation level data. The input can be any pair of BS-seq, oxBS-seq and Tab-seq data or all of them.
 
+\section{System requirements}
+We tested \prog{mlml} on various platforms, including Ubuntu, Unix/Linux system, and Mac OSX. \prog{mlml} is memory efficient. In our test run on a 64-bit Unix platform with Xeon E5420 2.5GHz processor, the runtime and memory usage for computing 5 million CpG sites are 10 minutes and 37MB respectively.
+
 \section{Input file format}
 %% Problem of describing input format. Should methpipe be mentioned?
 The input format is BED format file with 6 columns (\url{https://genome.ucsc.edu/FAQ/FAQformat.html\#format1}). Below is an example for a line of input file:
@@ -43,14 +46,14 @@ $ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
          -o result.bed
 \end{verbatim}
 
-In some cases, user might want to specify the covergence tolerance for EM algorithm. This can be done through \op{-t} option. For example:
+In some cases, user might want to specify the convergence tolerance for EM algorithm. This can be done through \op{-t} option. For example:
 \begin{verbatim}
 $ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
          -o result.bed -t 1e-2
 \end{verbatim}
-This command will make the iteration process stop when the diference of estimation between two iterations is less than $10^{-2}$. The value format can be scientific notation, e.g. 1e-5, or float number, e.g. 0.00001.
+This command will make the iteration process stop when the difference of estimation between two iterations is less than $10^{-2}$. The value format can be scientific notation, e.g. 1e-5, or float number, e.g. 0.00001.
 
-\section{Output file format}
+\section{Output file format}	
 The output of \prog{mlml} is also in BED format. Here is an example:
 \begin{verbatim}
 chr1    3001345 3001346 mC:0.125        0.652778        +
@@ -59,6 +62,15 @@ The fourth column is estimated 5mC level, and the fifth column is 5hmC level. No
 
 \section{FAQ}
 \begin{itemize}
+\item Q: I had some errors in compiling/installing the software.\\
+A: Compiling errors can be very complicated. But from the tests we have done, we strongly recommend you to check your complier and GSL versions (see readme.txt) and make sure they are up to date and correctly installed.
+
+\item Q: I had an error like the following, what's that?
+\begin{verbatim}
+Segmentation fault.
+\end{verbatim}
+A: Please check if your hardware conforms with the system requirements, and make sure all the options set for \prog{mlml} are correct, e.g. no bad path or incomplete options.
+
 \item Q: I got result like this, what happened?
 \begin{verbatim}
 chr1    10570   10571   mC:nan  nan     +
