@@ -7,7 +7,6 @@
 #include "smithlab_os.hpp"
 
 #include <gsl/gsl_sf_gamma.h>
-#include <gsl/gsl_rng.h>
 
 using std::string;
 using std::vector;
@@ -58,21 +57,12 @@ log_L(const size_t h, const size_t g, const size_t m, const size_t l,
 }
 
 static void
-get_start_point(const bool RAND_START, const gsl_rng *rng,
-                const size_t t, const size_t u,
+get_start_point(const size_t t, const size_t u,
 		const size_t m, const size_t l,
 		const size_t h, const size_t g,
 		const double tolerance,
 		double &p_m, double &p_h) {
   //get start point if all 3 inputs are available
-
-  //use random starting points
-  if (RAND_START) {
-    p_m = gsl_rng_uniform(rng);
-    p_h = (1.0 - p_m) * gsl_rng_uniform(rng);
-    //p_h = 1.0 - p_m;
-    return;
-  }
 
   if (t + u == 0) {
     p_m = 1.0*m/(m + l);
@@ -91,21 +81,12 @@ get_start_point(const bool RAND_START, const gsl_rng *rng,
 }
 
 static void
-get_start_point(const bool RAND_START, const gsl_rng *rng,
-                const bool oxseq_empty, const bool tabseq_empty,
+get_start_point(const bool oxseq_empty, const bool tabseq_empty,
 		const size_t x, const size_t y,
 		const size_t z, const size_t w,
 		const double tolerance,
 		double &p_m, double &p_h) {
   //get start point if only 2 inputs are available
-
-  //use random starting points
-  if (RAND_START) {
-    p_m = gsl_rng_uniform(rng);
-    p_h = (1.0 - p_m) * gsl_rng_uniform(rng);
-    //p_h = 1.0 - p_m;
-    return;
-  }
 
   if (tabseq_empty) { // BS + ox
     p_m = 1.0*w/(z + w);
@@ -253,7 +234,6 @@ main(int argc, const char **argv) {
   try {
   
     bool VERBOSE = false;
-    bool USE_RAND_START = false;
     string oxbs_seq_file;
     string hydroxy_file;
     string bs_seq_file;
@@ -273,7 +253,6 @@ main(int argc, const char **argv) {
 		      false , oxbs_seq_file);
     opt_parse.add_opt("tolerance", 't', "EM convergence threshold. Default 1e-10",
 		      false , tolerance);
-    opt_parse.add_opt("rand", 'r', "Use random start points", false, USE_RAND_START);
     opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
     vector<string> leftover_args;
 
@@ -313,11 +292,6 @@ main(int argc, const char **argv) {
     size_t t = 0;
     size_t x = 0, y = 0, z = 0, w = 0, a = 0, b= 0;
 
-    // setup the random number generator
-    gsl_rng_env_setup();
-    gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
-    gsl_rng_set(rng, time(0) + getpid());
-
     if (!hydroxy_file.empty() && !bs_seq_file.empty() && !oxbs_seq_file.empty()) {
       std::ifstream h_in(hydroxy_file.c_str());
       std::ifstream b_in(bs_seq_file.c_str());
@@ -345,7 +319,7 @@ main(int argc, const char **argv) {
 	  x = g; y = h;
 	  z = m; w = l;
 	  a = t; b = u;
-	  get_start_point(USE_RAND_START,rng,t,u,m,l,h,g,tolerance,p_m,p_h);
+	  get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
 	  expectation_maximization(VERBOSE, x, y, z, w, a, b, tolerance, p_m, p_h); 
 	  if (p_h <= 2.0*tolerance) p_h = 0.0;
 	  if (p_m <= 2.0*tolerance) p_m = 0.0;
@@ -389,7 +363,7 @@ main(int argc, const char **argv) {
 	
 	double p = 0.0, q = 0.0, r = 0.0;
 	if (x + y > 0 && z + w > 0) {
-	  get_start_point(USE_RAND_START,rng,oxbs_seq_file.empty(),hydroxy_file.empty(),x,y,z,w,tolerance,p,q);
+	  get_start_point(oxbs_seq_file.empty(),hydroxy_file.empty(),x,y,z,w,tolerance,p,q);
 	  expectation_maximization(VERBOSE,x, y, z, w, 0, 0, tolerance, p, q); 
 	  r = 1.0 - p - q;
 	  if (p <= 2.0*tolerance) p = 0.0;

@@ -32,6 +32,8 @@ chr1    3001345 3001346 CpG:9   0.777777777778  +
 \noindent
 The first three columns are genomic coordinates of a region. The fourth column indicates that this site is a CpG site, and the number of reads covering this site is 9. The fifth column is the methylation level of the CpG site, ranging from 0 to 1. This level is usually calculated from the number of methylated reads covering one site dividing by the total number of reads included in the fourth column.
 
+We also provide some sample data with the package. The sample data have real methylation values attached to the last column as a reference for the accuracy of estimation.
+
 \section{Usage}
 The usage of \prog{mlml} is simple: specify the input files with corresponding options to their types. \prog{mlml} can take various types of input combinations. Assume user has three input files ready: \fn{meth\_BS-seq.bed}, \fn{meth\_oxBS-seq.bed} and \fn{meth\_Tab-seq.bed}, all in the format described above. The following command will take all the inputs:
 \begin{verbatim}
@@ -69,7 +71,7 @@ A: Compiling errors can be very complicated. But from the tests we have done, we
 \begin{verbatim}
 Segmentation fault.
 \end{verbatim}
-A: Please check if your hardware conforms with the system requirements, and make sure all the options set for \prog{mlml} are correct, e.g. no bad path or incomplete options.
+A: Please check if your hardware conforms with the system requirements, and make sure all the options set for \prog{mlml} are correct, e.g. no bad path and all options are complete.
 
 \item Q: I got result like this, what happened?
 \begin{verbatim}
