@@ -29,13 +29,13 @@ wilson_ci_for_binomial(const double alpha, const double n,
   upper = std::min(1.0, (first_term + z*std::sqrt(discriminant))/denom);
 }
 
-bool
+int
 binom_null(const double alpha, const double n, const double p_hat, const double p){
   double lower;
   double upper;
   wilson_ci_for_binomial(alpha, n, p_hat, lower, upper) ;
-  if(p < upper && p >lower) return true;
-  else return false;
+  if(p < upper && p >lower) return 0;
+  else return 1;
 }
 
 
@@ -160,7 +160,7 @@ update_p_m(const size_t x, const size_t y,
 
 
 static void
-expectation_maximization(const bool VERBOSE,
+expectation_maximization(const bool DEBUG,
 			 const size_t x, const size_t y,
 			 const size_t z, const size_t w,
 			 const size_t a, const size_t b,
@@ -169,12 +169,12 @@ expectation_maximization(const bool VERBOSE,
   size_t iter = 0;
   double delta = std::numeric_limits<double>::max();
 
-  /*  if (VERBOSE) {
+  if (DEBUG) {
     cerr << "t:" << a << ", u:" << b
       << ", m:" << z << ", l:" << w
       << ", h:" << y << ", g:" << x << endl
       << "p:" << p << ", q:" << q << endl;
-      } */
+      }
 
   do {
     vector<vector<double> > coeff;
@@ -191,11 +191,11 @@ expectation_maximization(const bool VERBOSE,
 
   }
   while (delta > tolerance && iter <=500);
-  if (VERBOSE) {
+  if (DEBUG) {
     cerr << iter << '\t'
-	 << "p_m=" << p << '\t'
-	 << "p_h=" << q << '\t'
-	 << "log-likelihood=" << log_L(y,x,z,w,b,a,q, p) << endl;
+      << "p_m=" << p << '\t'
+      << "p_h=" << q << '\t'
+      << "log-likelihood=" << log_L(y,x,z,w,b,a,q, p) << endl;
   }
 }
 
@@ -271,7 +271,7 @@ update_q(const size_t x, const size_t y,
 }
 
 static void
-expectation_maximization(const bool VERBOSE,
+expectation_maximization(const bool DEBUG,
 			 const size_t x, const size_t y,
 			 const size_t z, const size_t w,
 			 const double tolerance, 
@@ -291,7 +291,7 @@ expectation_maximization(const bool VERBOSE,
     delta = max(fabs(p_old - p), fabs(q_old - q)); 
     iter ++;
   }  while (delta > tolerance && iter <= 500);
-  if (VERBOSE) {
+  if (DEBUG) {
     cerr << iter << '\t'
 	 << "p=" << p << '\t'
 	 << "q=" << q << '\t'
@@ -331,13 +331,13 @@ main(int argc, const char **argv) {
   try {
   
     bool VERBOSE = false;
-    bool FLAG = false;
+    bool FLAG = true;
     string oxbs_seq_file;
     string hydroxy_file;
     string bs_seq_file;
     string outfile; 
     double alpha = 0.05;
-    static double tolerance = 1e-15;
+    static double tolerance = 1e-10;
   
 
     /****************** COMMAND LINE OPTIONS ********************/
@@ -352,11 +352,9 @@ main(int argc, const char **argv) {
 		      false , oxbs_seq_file);
     opt_parse.add_opt("tolerance", 't', "EM convergence threshold. Default 1e-10",
 		      false , tolerance);
-    opt_parse.add_opt("flag-conflict", 'f', "Flag sites showing strong conflict signals", false,
-		      FLAG);
-    opt_parse.add_opt("alpha", 'a', "significance level for binomial test, default 0.05", false,
+    opt_parse.add_opt("alpha", 'a', "significance level of binomial test for each site. Default 0.05", false,
 		      alpha);
-    opt_parse.add_opt("verbose", 'v', "print more run info", false, VERBOSE);
+    opt_parse.add_opt("verbose", 'v', "print run statistics", false, VERBOSE);
     vector<string> leftover_args;
 
     opt_parse.parse(argc, argv, leftover_args);
@@ -392,13 +390,16 @@ main(int argc, const char **argv) {
     /****************** END COMMAND LINE OPTIONS *****************/
     std::ofstream out(outfile.empty() ? "/dev/stdout" : outfile.c_str());
 	
-    size_t h = 0;
-    size_t g = 0;
-    size_t m = 0;
-    size_t l = 0;
-    size_t u = 0;
-    size_t t = 0;
+    size_t h = 0, g = 0;
+    size_t m = 0, l = 0;
+    size_t u = 0, t = 0;
     size_t x = 0, y = 0, z = 0, w = 0, a = 0, b= 0;
+    size_t total_sites = 0, overshoot_sites = 0, conflict_sites = 0;
+
+    if (VERBOSE) {
+      cerr << "Output format:" << endl
+        << "chrom	start	end	pm	ph	pu	#_of_conflict" << endl;
+    }
 
     if (!hydroxy_file.empty() && !bs_seq_file.empty() && !oxbs_seq_file.empty()) {
       std::ifstream h_in(hydroxy_file.c_str());
@@ -420,8 +421,9 @@ main(int argc, const char **argv) {
 	assert(h_chr == b_chr && h_chr == o_chr && 
 	       h_pos == o_pos && h_pos == b_pos);
 	
-	double p_m = 0.0, p_h = 0.0;
-	bool CONFLICT=false, cflt_m, cflt_h, cflt_u;
+        total_sites++;
+	double p_m = 0.0, p_h = 0.0, p_u;
+	int CONFLICT=0, cflt_m, cflt_h, cflt_u;
 	double p_m_hat, p_h_hat, p_u_hat;
 	if ((h + g > 0 && u + t > 0 ) ||
 	    (h + g > 0 && m + l > 0 ) ||
@@ -432,31 +434,38 @@ main(int argc, const char **argv) {
 	  p_h_hat =  static_cast<double>(y)/(x+y);
 	  p_m_hat =  static_cast<double>(z)/(z+w);
 	  p_u_hat =  static_cast<double>(b)/(a+b);
-	  if(p_h_hat+p_m_hat+p_u_hat ==1.0){
+
+          // use frequent method result if no overshoot
+	  if(p_h_hat+p_m_hat+p_u_hat ==1.0) {
 	    out << h_chr << '\t' << h_pos << '\t'
-		<< h_pos +1 << '\t' <<p_m_hat << '\t'
-		<< p_h_hat << '\t' << p_u_hat << "\tN" << endl;
+		<< h_pos + 1 << '\t' <<p_m_hat << '\t'
+		<< p_h_hat << '\t' << p_u_hat << "\t0" << endl;
 	  }
 	  else{
+            overshoot_sites++;
 	    get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
-	    expectation_maximization(VERBOSE, x, y, z, w, a, b, tolerance, p_m, p_h); 
+	    expectation_maximization(false, x, y, z, w, a, b, tolerance, p_m, p_h); 
+
+            p_u = 1 - p_m - p_h;
 	    if (p_h <= 2.0*tolerance) p_h = 0.0;
 	    if (p_m <= 2.0*tolerance) p_m = 0.0;
+	    if (p_u <= 2.0*tolerance) p_u = 0.0;
 	    if (p_m >= 1.0-2.0*tolerance) p_m = 1.0;
 	    if (p_h >= 1.0-2.0*tolerance) p_h = 1.0;
-	    if(p_h_hat+p_m_hat+p_u_hat!=1 && FLAG){
-	      cflt_h = !binom_null( alpha, static_cast<double>(x+y),  p_h_hat,  p_h);
-	      cflt_m = !binom_null( alpha, static_cast<double>(z+w),  p_m_hat,  p_m);
-	      cflt_u = !binom_null( alpha, static_cast<double>(a+b),  p_u_hat,  1.0 - p_m - p_h);
-	      CONFLICT = (cflt_m && cflt_h) ||  (cflt_u && cflt_h) || (cflt_m && cflt_u);
+	    if (p_u >= 1.0-2.0*tolerance) p_u = 1.0;
+
+	    if(p_h_hat+p_m_hat+p_u_hat != 1 && FLAG) {
+	      cflt_h = binom_null( alpha, static_cast<double>(x+y),  p_h_hat,  p_h);
+	      cflt_m = binom_null( alpha, static_cast<double>(z+w),  p_m_hat,  p_m);
+	      cflt_u = binom_null( alpha, static_cast<double>(a+b),  p_u_hat,  p_u);
+	      //CONFLICT = (cflt_m && cflt_h) ||  (cflt_u && cflt_h) || (cflt_m && cflt_u);
+	      CONFLICT = cflt_m + cflt_u + cflt_h;
 	    }
 	    out << h_chr << '\t' << h_pos << '\t'
-		<< h_pos +1 << '\t' << p_m << '\t'
-		<< p_h << "\t" << 1.0 - p_m-p_h ;
-	    if(CONFLICT)
-	      out << "\tC" << endl;
-	    else
-	      out << "\tN" << endl;
+		<< h_pos + 1 << '\t' << p_m << '\t'
+		<< p_h << "\t" << p_u << "\t" << CONFLICT << endl;
+	    if(CONFLICT > 1)
+              conflict_sites ++;
 	  }
 	}
 	else {
@@ -492,17 +501,20 @@ main(int argc, const char **argv) {
 
 	assert(f_chr == s_chr && f_pos == s_pos);
 	
+        total_sites++;
 	double p = 0.0, q = 0.0, r = 0.0;
-	bool CONFLICT=false, cflt1, cflt2;
+	int CONFLICT=0, cflt1, cflt2;
 	double p_hat1, p_hat2;
 	if(x + y > 0 && z + w >0) {
 	  if( static_cast<double>(x)/(x+y) +  static_cast<double>(z)/(z+w) <= 1.0){
 	  p = static_cast<double>(x)/(x+y);
 	  q = static_cast<double>(z)/(z+w);
 	  r = 1.0-p-q;
-	  }else {
+	  }
+          else {
+            overshoot_sites++;
 	    get_start_point(x,y,z,w,tolerance,p,q);
-	    expectation_maximization(VERBOSE,x, y, z, w, tolerance, p, q); 
+	    expectation_maximization(false,x, y, z, w, tolerance, p, q); 
 	    r = 1.0 - p - q;
 	    if (p <= 2.0*tolerance) p = 0.0;
 	    if (q <= 2.0*tolerance) q = 0.0;
@@ -515,7 +527,7 @@ main(int argc, const char **argv) {
 	      cflt1 = !binom_null( alpha, static_cast<double>(x+y),  p_hat1,  p);
 	      p_hat2 =  static_cast<double>(z)/(z+w);
 	      cflt2 = !binom_null( alpha, static_cast<double>(z+w),  p_hat2,  q);
-	      CONFLICT = cflt1 || cflt2;
+	      CONFLICT = cflt1 + cflt2;
 	    }
 	  }
 	  out << f_chr << '\t' << f_pos << '\t'
@@ -528,8 +540,9 @@ main(int argc, const char **argv) {
 	  else 
 	    out << p << '\t' << q << '\t' << r << '\t';
 
-	  if(CONFLICT)  out << 'C' << endl;
-	  else   out << 'N' << endl;
+          out << CONFLICT << endl;
+	  if (CONFLICT > 1)
+            conflict_sites++;
 	  
 	}else {
 	  out << f_chr << '\t' << f_pos << '\t'
@@ -537,6 +550,13 @@ main(int argc, const char **argv) {
 	}
       } 
     }
+
+    if (VERBOSE)
+      cerr << "Total sites: " << total_sites << endl
+        << "Sites with overshoot: " << overshoot_sites << " ("
+        << 1.0*overshoot_sites/total_sites*100 << "%)" << endl
+        << "Sites conflicting to at least two input: " << conflict_sites << " ("
+        << 1.0*conflict_sites/total_sites*100 << "%)" << endl;
   }
   catch (const SMITHLABException &e) {
     cerr << e.what() << endl;
