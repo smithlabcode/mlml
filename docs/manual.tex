@@ -37,10 +37,10 @@ We also provide some sample data with the package. The sample data have real met
 \section{Usage}
 The usage of \prog{mlml} is simple: specify the input files with corresponding options to their types. \prog{mlml} can take various types of input combinations. Assume user has three input files ready: \fn{meth\_BS-seq.bed}, \fn{meth\_oxBS-seq.bed} and \fn{meth\_Tab-seq.bed}, all in the format described above. The following command will take all the inputs:
 \begin{verbatim}
-$ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
+$ ./mlml -v -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
          -h meth_Tab-seq.bed -o result.bed
 \end{verbatim}
-Note this command should be run in the path where \prog{mlml} is installed. The option \op{-o} will direct the output to file \fn{result.bed}.
+Note this command should be run in the path where \prog{mlml} is installed. The option \op{-o} will direct the output to file \fn{result.bed}. The option \op{-v} will provide some useful statistics information.
 
 If only two types of input are available, e.g. \fn{meth\_BS-seq.bed} and \fn{meth\_oxBS-seq.bed}, then use the following command:
 \begin{verbatim}
@@ -61,6 +61,9 @@ The output of \prog{mlml} is also in BED format. Here is an example:
 chr1    3001345 3001346 mC:0.125        0.652778        +
 \end{verbatim}
 The fourth column is estimated 5mC level, and the fifth column is 5hmC level. Note that the output is always in this format, no matter what combination of inputs are used. Therefore user can easily extract 5mC and 5hmC levels from specific columns.
+
+\section{Example data}
+There are three example data files in \fn{example\_data} directory. These files have simulated CpG coverage and methylation level. For each CpG, true methylation levels are simulated from one Dirichlet distribution, so that the sum of all three levels is equal to 1. Then sequencing coverage is simulated and methylation level for each site is determined by binomial sampling. The true levels are attached as the last column in the files.
 
 \section{FAQ}
 \begin{itemize}

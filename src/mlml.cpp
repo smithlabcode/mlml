@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "OptionParser.hpp"
-#include "smithlab_utils.hpp"
 #include "smithlab_os.hpp"
 
 #include <gsl/gsl_sf_gamma.h>
