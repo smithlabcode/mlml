@@ -34,7 +34,6 @@ binom_null(const double alpha, const double n, const double p_hat, const double 
   double lower;
   double upper;
   wilson_ci_for_binomial(alpha, n, p_hat, lower, upper) ;
-  //cerr << "lower=" << lower << "; p" << p << "; upper=" << upper << endl;
   if(p < upper && p >lower) return true;
   else return false;
 }
@@ -93,11 +92,14 @@ get_start_point(const size_t t, const size_t u,
 		const size_t h, const size_t g,
 		const double tolerance,
 		double &p_m, double &p_h) {
-
-  p_m = 1.0*m/(m + l);
-  p_h = 1.0*h/(h + g);
-  p_m = max(tolerance, min(p_m, 1-2*tolerance));
-  p_h = max(tolerance, min(p_h, 1-tolerance-p_m));
+  
+  p_m = 1.0*m/(m + l)+tolerance;
+  p_h = 1.0*h/(h + g)+tolerance;
+  double p_u = 1.0*u/(t+u)+tolerance;
+  double sum = p_m + p_h + p_u;
+  p_m = p_m/sum;
+  p_h = p_h/sum;
+  
 }
 
 static void
@@ -167,12 +169,12 @@ expectation_maximization(const bool VERBOSE,
   size_t iter = 0;
   double delta = std::numeric_limits<double>::max();
 
-  if (VERBOSE) {
+  /*  if (VERBOSE) {
     cerr << "t:" << a << ", u:" << b
       << ", m:" << z << ", l:" << w
       << ", h:" << y << ", g:" << x << endl
       << "p:" << p << ", q:" << q << endl;
-  }
+      } */
 
   do {
     vector<vector<double> > coeff;
@@ -186,16 +188,15 @@ expectation_maximization(const bool VERBOSE,
     delta = max(fabs(p_old - p), fabs(q_old - q));
   
     iter ++; 
-    if (VERBOSE) {
-      cerr << iter << '\t'
-	   << "M=" << M << '\t'
-	   << "p_m=" << p << '\t'
-	   << "p_h=" << q << '\t'
-	   << "delta=" << delta << '\t'
-	   <<"log-likelihood=" << log_L(y,x,z,w,b,a,q, p) << endl;
-    }
+
   }
   while (delta > tolerance && iter <=500);
+  if (VERBOSE) {
+    cerr << iter << '\t'
+	 << "p_m=" << p << '\t'
+	 << "p_h=" << q << '\t'
+	 << "log-likelihood=" << log_L(y,x,z,w,b,a,q, p) << endl;
+  }
 }
 
 //////////////////////////
@@ -223,12 +224,13 @@ get_start_point(const size_t x, const size_t y,
 		const double tolerance,
 		double &p, double &q) {
 
-  p = max(tolerance, 1.0*x/(x + y));
-  q = max(tolerance, 1.0*z/(z + w));  
-  if(p+q > 1.0-tolerance){
-    p = max(tolerance, (1.0 - 2*tolerance)*p/(p+q));
+  p = tolerance + 1.0*x/(x + y);
+  q = tolerance + 1.0*z/(z + w);  
+  if( p + q >= 1.0 ){
+    p = max(tolerance, (1.0 - tolerance)*p/(p+q) );
     q = max(tolerance, 1.0 - p - tolerance);
   }
+ 
 }
 
 static void
@@ -277,44 +279,30 @@ expectation_maximization(const bool VERBOSE,
   size_t iter = 0;
   double delta = std::numeric_limits<double>::max();
 
-  if (VERBOSE) {
-    cerr << "x:" << x << ", y:" << y
-      << ", z:" << y << ", w:" << w << endl
-      << "p:" << p << ", q:" << q << endl;
-  }
-
   do {
     vector<double> coeff;
     expectation( y, p, q, coeff);
     const double M = maximization(x, y, coeff);
     const double p_old = p, q_old = q;
-    p = update_q(x, y, z, w, coeff);
+    q = update_q(x, y, z, w, coeff);
     p = M*(1 - q); 
     p = max(tolerance, min(p, 1-2*tolerance));
     q = max(tolerance, min(q, 1-tolerance-p));
-    delta = max(fabs(p_old - p), fabs(q_old - q));
-  
+    delta = max(fabs(p_old - p), fabs(q_old - q)); 
     iter ++;
-    if (VERBOSE) {
-      cerr << iter << '\t'
-	   << "M=" << M << '\t'
-	   << "p_m=" << p << '\t'
-	   << "p_h=" << q << '\t'
-	   << "delta=" << delta << '\t'
-	   <<"log-likelihood=" << log_L(x, y, z, w, p, q) << endl;
-    }
+  }  while (delta > tolerance && iter <= 500);
+  if (VERBOSE) {
+    cerr << iter << '\t'
+	 << "p=" << p << '\t'
+	 << "q=" << q << '\t'
+	 <<"log-likelihood=" << log_L(x, y, z, w, p, q) << endl;
   }
-  while (delta > tolerance && iter <= 500);
 }
 
 
 //////////////////////////
 //  common           /////
 //////////////////////////
-// when REV= false : 'a' is the number of C reads, 
-//        and 'b' is the number of T reads.
-// when REV= true : 'a' is the number of T reads, 
-//        and 'b' is the number of C reads.
 static void
 parse_line(const bool REV, const string &line,
 	   size_t &a, size_t &b, string &chr, size_t &pos) {
@@ -330,14 +318,9 @@ parse_line(const bool REV, const string &line,
     atoi(str_count.substr(str_count.find_first_of(":") + 1).c_str());
   if (count > 50) count = 50;
   
-  if (REV) {
-    b = static_cast<size_t>(count*level + 0.5);
-    a = count - b;
-  }
-  else {
-    a = static_cast<size_t>(count*level + 0.5);
-    b = count - a;
-  }
+  a = static_cast<size_t>(count*level + 0.5);
+  b = count - a;
+  if (REV) std::swap(a, b);
 }
 
 
@@ -354,7 +337,7 @@ main(int argc, const char **argv) {
     string bs_seq_file;
     string outfile; 
     double alpha = 0.05;
-    static double tolerance = 1e-10;
+    static double tolerance = 1e-15;
   
 
     /****************** COMMAND LINE OPTIONS ********************/
@@ -369,7 +352,7 @@ main(int argc, const char **argv) {
 		      false , oxbs_seq_file);
     opt_parse.add_opt("tolerance", 't', "EM convergence threshold. Default 1e-10",
 		      false , tolerance);
-    opt_parse.add_opt("flag-conflict", 'r', "Flag sites showing strong conflict signals", false,
+    opt_parse.add_opt("flag-conflict", 'f', "Flag sites showing strong conflict signals", false,
 		      FLAG);
     opt_parse.add_opt("alpha", 'a', "significance level for binomial test, default 0.05", false,
 		      alpha);
@@ -451,8 +434,8 @@ main(int argc, const char **argv) {
 	  p_u_hat =  static_cast<double>(b)/(a+b);
 	  if(p_h_hat+p_m_hat+p_u_hat ==1.0){
 	    out << h_chr << '\t' << h_pos << '\t'
-		<< h_pos +1 << '\t' << "mC:"<<p_m_hat << '\t'
-		<< p_h_hat << '\t' << '+' << endl;
+		<< h_pos +1 << '\t' <<p_m_hat << '\t'
+		<< p_h_hat << '\t' << p_u_hat << "\tN" << endl;
 	  }
 	  else{
 	    get_start_point(t,u,m,l,h,g,tolerance,p_m,p_h);
@@ -460,29 +443,25 @@ main(int argc, const char **argv) {
 	    if (p_h <= 2.0*tolerance) p_h = 0.0;
 	    if (p_m <= 2.0*tolerance) p_m = 0.0;
 	    if (p_m >= 1.0-2.0*tolerance) p_m = 1.0;
-	    if (p_h >= 1.0-2.0*tolerance) p_h =1.0;
-	    if (p_m + p_h >= 1.0-2.0*tolerance && p_h > 2.0*tolerance) p_h += tolerance;
+	    if (p_h >= 1.0-2.0*tolerance) p_h = 1.0;
 	    if(p_h_hat+p_m_hat+p_u_hat!=1 && FLAG){
 	      cflt_h = !binom_null( alpha, static_cast<double>(x+y),  p_h_hat,  p_h);
 	      cflt_m = !binom_null( alpha, static_cast<double>(z+w),  p_m_hat,  p_m);
-	      cflt_u = !binom_null( alpha, static_cast<double>(a+b),  p_u_hat,  1-p_m - p_h);
+	      cflt_u = !binom_null( alpha, static_cast<double>(a+b),  p_u_hat,  1.0 - p_m - p_h);
 	      CONFLICT = (cflt_m && cflt_h) ||  (cflt_u && cflt_h) || (cflt_m && cflt_u);
 	    }
-	    if(CONFLICT){
-	      out << h_chr << '\t' << h_pos << '\t'
-		  << h_pos +1 << '\t' << "CONFLICTmC:"<<p_m << '\t'
-		  << p_h << '\t' << '+' << endl;
-	    }
-	    else{
-	      out << h_chr << '\t' << h_pos << '\t'
-		  << h_pos +1 << '\t' << "mC:"<<p_m << '\t'
-		  << p_h << '\t' << '+' << endl;
-	    }
+	    out << h_chr << '\t' << h_pos << '\t'
+		<< h_pos +1 << '\t' << p_m << '\t'
+		<< p_h << "\t" << 1.0 - p_m-p_h ;
+	    if(CONFLICT)
+	      out << "\tC" << endl;
+	    else
+	      out << "\tN" << endl;
 	  }
 	}
 	else {
 	  out << h_chr << '\t' << h_pos << '\t'
-	      << h_pos +1 << '\t' << "mC:nan\tnan\t+" << endl;
+	      << h_pos +1 << '\t' << "nan\tnan\tnan\tnan" << endl;
 	}
       }
     }
@@ -531,7 +510,6 @@ main(int argc, const char **argv) {
 	    if (p >= 1.0 - 2.0*tolerance) p = 1.0;
 	    if (q >= 1.0 - 2.0*tolerance) q = 1.0;
 	    if (r >= 1.0 - 2.0*tolerance) r = 1.0;
-	    if (p + q >= 1.0 - 2.0*tolerance && q > 2.0*tolerance) q += tolerance;
 	    if(FLAG){
 	      p_hat1 =  static_cast<double>(x)/(x+y);
 	      cflt1 = !binom_null( alpha, static_cast<double>(x+y),  p_hat1,  p);
@@ -540,23 +518,22 @@ main(int argc, const char **argv) {
 	      CONFLICT = cflt1 || cflt2;
 	    }
 	  }
-	  if(CONFLICT){
-	    out << f_chr << '\t' << f_pos << '\t'
-		<< f_pos + 1 << "\tCONFLICTmC:";
-	  }else{
-	    out << f_chr << '\t' << f_pos << '\t'
-		<< f_pos +1 << '\t' << "mC:";
-	  }
+	  out << f_chr << '\t' << f_pos << '\t'
+	      << f_pos + 1 << '\t';
+
 	  if (oxbs_seq_file.empty())
-	    out << r << '\t' << p << '\t' << '+' << endl;
+	    out << r << '\t' << p << '\t' << q << '\t';
 	  else if (hydroxy_file.empty())
-	    out << q << '\t' << r << '\t' << '+' << endl;
+	    out << q << '\t' << r << '\t' << p << '\t';
 	  else 
-	    out << p << '\t' << q << '\t' << '+' << endl;
+	    out << p << '\t' << q << '\t' << r << '\t';
+
+	  if(CONFLICT)  out << 'C' << endl;
+	  else   out << 'N' << endl;
 	  
 	}else {
 	  out << f_chr << '\t' << f_pos << '\t'
-	      << f_pos + 1 << "\tmC:nan\tnan\t+" << endl;
+	      << f_pos + 1 << "\tnan\tnan\tnan\tnan" << endl;
 	}
       } 
     }
