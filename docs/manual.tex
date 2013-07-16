@@ -56,11 +56,17 @@ $ ./mlml -u meth_BS-seq.bed -m meth_oxBS-seq.bed \
 This command will make the iteration process stop when the difference of estimation between two iterations is less than $10^{-2}$. The value format can be scientific notation, e.g. 1e-5, or float number, e.g. 0.00001.
 
 \section{Output file format}	
-The output of \prog{mlml} is also in BED format. Here is an example:
-\begin{verbatim}
-chr1    3001345 3001346 mC:0.125        0.652778        +
-\end{verbatim}
-The fourth column is estimated 5mC level, and the fifth column is 5hmC level. Note that the output is always in this format, no matter what combination of inputs are used. Therefore user can easily extract 5mC and 5hmC levels from specific columns.
+The output of \prog{mlml} is tab-delimited format. Here is an example.
+\begin{table}[h!]
+\centering
+\begin{tabular}{ccccccc}
+chromosome & start & end & 5mC level & 5hmC level & unmethylated level &  \# of conflicts \\
+\hline
+chr1 & 1 & 2 & 0.166667 & 0.19697 & 0.636364 & 0 \\
+chr1 & 11 & 12 & 0.222222 & 0 & 0.777778 & 2\\
+\end{tabular}
+\end{table}
+The last column is the number of conflict events, in which a binomial test is performed for each input methylation level (can be 2 or 3 in total depending on parameters). If the estimated methylation level falls out of the confidence interval calculated from input coverage and methylation level, then such event is counted as one conflict. We recommend users to filter estimation results based on the number of conflicts; if more conflicts happens on one site then it is possible that information from such site is not highly reliable. Note that the output is always in this format, no matter what combination of inputs are used. Thus user can easily extract 5mC and 5hmC levels from specific columns.
 
 \section{Example data}
 There are three example data files in \fn{example\_data} directory. These files have simulated CpG coverage and methylation level. For each CpG, true methylation levels are simulated from one Dirichlet distribution, so that the sum of all three levels is equal to 1. Then sequencing coverage is simulated and methylation level for each site is determined by binomial sampling. The true levels are attached as the last column in the files.
