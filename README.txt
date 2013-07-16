@@ -49,22 +49,26 @@ USAGE
   Specify the convergence tolerance of EM algorithm. Default value is 1e-10.
   Larger value will yield more accurate result, with the cost of longer runtime.
 
+-a, -alpha
+  Specify the alpha of binomial test confidence interval. Default value is 0.05.
+  Smaller value will make the test more stringent.
+
 -v, -verbose
   Turn on verbose mode. Default off. If turned on, the program will print
-  detailed information to the screen for debug and test purposes.
+  detailed information to the screen of run statistics. Recommended.
 
 EXAMPLES
 -------------------------------------------------------------------------------
 (1) all 3 types of inputs are available:
 
-  mlml -u FILE_BS -m FILE_OX -h FILE_TAB -o OUTPUT_FILE
+  mlml -v -u FILE_BS -m FILE_OX -h FILE_TAB -o OUTPUT_FILE
 
   This will make the program load methylation data from FILE_BS, FILE_OX and
   FILE_TAB respectively, and write output to OUTPUT_FILE
 
 (2) only BS-seq data and Tab-seq data are available:
 
-  mlml -u FILE_BS -h FILE_TAB -o OUTPUT_FILE
+  mlml -v -u FILE_BS -h FILE_TAB -o OUTPUT_FILE
 
   The program will load methylation data from FILE_BS and FILE_TAB.
 
