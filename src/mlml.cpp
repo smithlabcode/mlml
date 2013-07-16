@@ -523,9 +523,9 @@ main(int argc, const char **argv) {
 	    if (r >= 1.0 - 2.0*tolerance) r = 1.0;
 	    if(FLAG){
 	      p_hat1 =  static_cast<double>(x)/(x+y);
-	      cflt1 = !binom_null( alpha, static_cast<double>(x+y),  p_hat1,  p);
+	      cflt1 = binom_null( alpha, static_cast<double>(x+y),  p_hat1,  p);
 	      p_hat2 =  static_cast<double>(z)/(z+w);
-	      cflt2 = !binom_null( alpha, static_cast<double>(z+w),  p_hat2,  q);
+	      cflt2 = binom_null( alpha, static_cast<double>(z+w),  p_hat2,  q);
 	      CONFLICT = cflt1 + cflt2;
 	    }
 	  }
