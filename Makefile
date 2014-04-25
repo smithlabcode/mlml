@@ -3,7 +3,7 @@
 #    Copyright (C) 2013 University of Southern California and
 #             Meng Zhou, Jianghan Qu, Andrew D. Smith
 #
-#    Authors: Meng Zhou, Jianghan Qu and Andrew D. Smith
+#    Authors: Jianghan Qu, Meng Zhou and Andrew D. Smith
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
