@@ -1,3 +1,9 @@
+DISCLAIMER
+-------------------------------------------------------------------------------
+MLML has become part of METHPIPE (https://github.com/smithlabcode/methpipe), 
+and is actively managed in METHPIPE. This stand-alone MLML repository is no 
+longer maintained as of Feb 2018. 
+
 For more details, please read the user manual in docs/manual.pdf
 
 PREREQUISITES
